@@ -2,11 +2,13 @@ import os
 import json
 from utils import pp
 from model import BuddhaGAN
+from dataGen import Datagen
 
 import tensorflow as tf
 
 flags = tf.app.flags
 flags.DEFINE_integer("epoch", 25, "")
+flags.DEFINE_integer("steps", 1000, "")
 flags.DEFINE_float("learning_rate", 0.001, "init learning rate")
 flags.DEFINE_integer("batch", 4, "batch size")
 flags.DEFINE_integer("max_to_keep", 3, "max ckpt to keep")
@@ -60,8 +62,9 @@ def main(_):
             FLAGS.c_dim,
             FLAGS.max_to_keep)
 
+    dataGen = Datagen(FLAGS.data_dir, FLAGS.z_dim, FLAGS.input_width, FLAGS.input_height keep_ratio=False)
     if FLAGS.train:
-        bdGan.train(FLAGS)
+        bdGan.train(FLAGS, dataGen)
     if FLAGS.inference:
         bdGan.inference(FLAGS.batch)
 

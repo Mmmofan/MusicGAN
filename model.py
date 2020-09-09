@@ -129,7 +129,11 @@ class BuddhaGAN(object):
         g_loss = sigmoid_cross_entropy_with_logits(G, tf.zeros_like(G))
         return [d_loss_real, d_loss_fake, g_loss]
 
-    def train(self, config):
+    def train(self, config, Data):
+        '''
+        config: 配置，FLAGS
+        data: 数据，class Datagen
+        '''
         d_optim = tf.train.AdamOptimizer(config.learning_rate).minimize(self.D_loss, var_list=self.D_vars)
         g_optim = tf.train.AdamOptimizer(config.learning_rate).minimize(self.G_loss, var_list=self.G_vars)
         try:
@@ -143,11 +147,12 @@ class BuddhaGAN(object):
         self.write = SummaryWriter(os.path.join(config.out_dir, 'logs'), self.sess.graph)
 
         # generate noise
-        sample_z = gen_random(size=[self.batch, self.z_dim])
+        Data.load_audio()
 
         counter = 1
         start_time = time.time()
 
+        # load ckpt (if specific)
         could_load, checkpoint_counter = self.load(config.checkpoint_dir)
         if could_load:
             counter = checkpoint_counter
@@ -156,9 +161,14 @@ class BuddhaGAN(object):
             print(" === loading checkpoint Fail === ")
 
         for epoch in xrange(config.epoch):
-            pass
-        # update D network
-        _, summary_str = self.sess.run([d_optim, ])
+            shuffle_audio = rand_audio(Data.audio_data)
+            if shuffle_audio.shape[0] < config.steps*self.batch:
+                config.steps = shuffle_audio.shape[0] // self.batch
+            for step in xrange(config.steps):
+                batch_audio = shuffle_audio[step*self.batch:step*self.batch+self.batch]
+                # batch_images =  TODO
+                # update D network
+                _, summary_str = self.sess.run([d_optim, ])
 
     def inference(self, config):
         raise NotImplementedError
