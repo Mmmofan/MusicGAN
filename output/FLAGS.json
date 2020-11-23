@@ -1,2 +1,25 @@
 {
-  "batch": 
+  "batch": 2,
+  "c_dim": 3,
+  "checkpoint_dir": "./model/",
+  "data_dir": "./Data/",
+  "df_dim": 64,
+  "epoch": 25,
+  "gf_dim": 64,
+  "h": false,
+  "help": false,
+  "helpfull": false,
+  "helpshort": false,
+  "inference": false,
+  "input_height": 128,
+  "input_width": 128,
+  "learning_rate": 0.001,
+  "max_to_keep": 3,
+  "out_dir": "./output/",
+  "output_height": 128,
+  "output_width": 128,
+  "steps": 1000,
+  "test": true,
+  "train": true,
+  "z_dim": 100
+}

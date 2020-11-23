@@ -2,7 +2,7 @@ import os
 import json
 from utils import pp
 from model import BuddhaGAN
-from dataGen import Datagen
+from datagen import Datagen
 
 import tensorflow as tf
 
@@ -10,20 +10,20 @@ flags = tf.app.flags
 flags.DEFINE_integer("epoch", 25, "")
 flags.DEFINE_integer("steps", 1000, "")
 flags.DEFINE_float("learning_rate", 0.001, "init learning rate")
-flags.DEFINE_integer("batch", 4, "batch size")
+flags.DEFINE_integer("batch", 2, "batch size")
 flags.DEFINE_integer("max_to_keep", 3, "max ckpt to keep")
 flags.DEFINE_integer("input_height", 128, "input image height")
 flags.DEFINE_integer("input_width", 128, "input image width")
 flags.DEFINE_integer("output_height", 128, "input image height")
 flags.DEFINE_integer("output_width", 128, "input image width")
-flags.DEFINE_integer("z_dim", 10, "noise z dimensions")
+flags.DEFINE_integer("z_dim", 100, "noise z dimensions")
 flags.DEFINE_integer("df_dim", 64, "noise z dimensions")
 flags.DEFINE_integer("gf_dim", 64, "noise z dimensions")
 flags.DEFINE_string("data_dir", "./Data/", "")
 flags.DEFINE_string("out_dir", "./output/", "")
 flags.DEFINE_integer("c_dim", 3, "image dimension")
 flags.DEFINE_string("checkpoint_dir", "./model/", "ckpt files dir")
-flags.DEFINE_boolean("train", False, "whether to train model")
+flags.DEFINE_boolean("train", True, "whether to train model")
 flags.DEFINE_boolean("inference", False, "whether to run inference")
 flags.DEFINE_boolean("test", True, "whether to test model during training")
 FLAGS = flags.FLAGS
@@ -42,7 +42,7 @@ def main(_):
     if not os.path.exists(FLAGS.out_dir): os.makedirs(FLAGS.out_dir)
 
     with open(os.path.join(FLAGS.out_dir, 'FLAGS.json'), 'w') as f:
-        flags_dict = {k:FLAGS[k] for k in FLAGS.keys()}
+        flags_dict = {k:FLAGS[k].value for k in FLAGS}
         json.dump(flags_dict, f, indent=2, sort_keys=True, ensure_ascii=False)
 
     # gpu option
@@ -62,11 +62,11 @@ def main(_):
             FLAGS.c_dim,
             FLAGS.max_to_keep)
 
-    dataGen = Datagen(FLAGS.data_dir, FLAGS.z_dim, FLAGS.input_width, FLAGS.input_height keep_ratio=False)
-    if FLAGS.train:
-        bdGan.train(FLAGS, dataGen)
-    if FLAGS.inference:
-        bdGan.inference(FLAGS.batch)
+        dataGen = Datagen(FLAGS.data_dir, FLAGS.z_dim, FLAGS.input_width, FLAGS.input_height, keep_ratio=False)
+        if FLAGS.train:
+            bdGan.train(FLAGS, dataGen)
+        if FLAGS.inference:
+            bdGan.inference(FLAGS.batch)
 
 if __name__ == "__main__": 
     tf.app.run()

@@ -2,6 +2,9 @@ from __future__ import print_function
 from __future__ import division
 import tensorflow as tf
 import numpy as np
+import os
+import random
+from PIL import Image
 from six.moves import xrange
 from ops import *
 from utils import *
@@ -13,7 +16,7 @@ class BuddhaGAN(object):
             input_width=240,
             output_height=240,
             output_width=240,
-            z_dim=10,
+            z_dim=100,
             gf_dim=64,
             df_dim=64,
             c_dim=3,
@@ -43,21 +46,20 @@ class BuddhaGAN(object):
         self.df_dim = df_dim
         self.max_to_keep = max_to_keep
 
-        self.input_ = tf.placeholder(tf.float32, [self.batch, self.input_height, self.input_width, 3], "input_") # input images
+        self.input_ = tf.placeholder(tf.float32, [self.batch, self.input_height, self.input_width, 3], "input_") # input real images
         self.z = tf.placeholder(tf.float32, [self.batch, self.z_dim], "z") # noise, sample from Pz
-        self.y = tf.placeholder(tf.float32, [self.batch, None], "y") # label
         self.build_model()
 
     def build_model(self):
         self.G = self.generator(self.z) # generated image
-        self.D_real = self.discriminator(self.input_, self.y, reuse=False)
-        self.D_fake = self.discriminator(self.G, self.y, reuse=True)
-        losses = self.loss_func(self.G, self.D_real, self.D_fake)
+        self.D_real = self.discriminator(self.input_, reuse=False)
+        self.D_fake = self.discriminator(self.G, reuse=True)
+        losses = self.loss_func(self.D_real, self.D_fake)
         self.D_real_loss = losses[0]
         self.D_fake_loss = losses[1]
         self.D_loss = losses[0] + losses[1]
         self.G_loss = losses[2]
-        self.total_loss = self.D_losss + self.G_loss
+        self.total_loss = self.D_loss + self.G_loss
 
         self.z_sum = histogram_summary("z", self.z)
         self.d_real_sum = histogram_summary("D_real", self.D_real)
@@ -74,10 +76,10 @@ class BuddhaGAN(object):
 
         self.saver = tf.train.Saver(max_to_keep=self.max_to_keep)
 
-    def discriminator(self, x, y, reuse=False):
+    def discriminator(self, x, reuse=False):
         """
+        Dicriminate an image is real or not
         x: image, [batch, w, h, c_dim]
-        y: label, [batch, 1]
         """
         with tf.variable_scope("discriminator") as scope:
             if reuse:
@@ -117,7 +119,7 @@ class BuddhaGAN(object):
             
             return tf.nn.tanh(h4)
 
-    def loss_func(self, G, D_real, D_fake):
+    def loss_func(self, D_real, D_fake):
         def sigmoid_cross_entropy_with_logits(x, y):
             try:
                 return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, labels=y)
@@ -125,8 +127,7 @@ class BuddhaGAN(object):
                 return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, targets=y)
         d_loss_real = sigmoid_cross_entropy_with_logits(D_real, tf.ones_like(D_real))
         d_loss_fake = sigmoid_cross_entropy_with_logits(D_fake, tf.zeros_like(D_fake))
-        # d_loss = d_loss_real + d_loss_fake
-        g_loss = sigmoid_cross_entropy_with_logits(G, tf.zeros_like(G))
+        g_loss = sigmoid_cross_entropy_with_logits(D_fake, tf.ones_like(D_fake))
         return [d_loss_real, d_loss_fake, g_loss]
 
     def train(self, config, Data):
@@ -136,18 +137,16 @@ class BuddhaGAN(object):
         '''
         d_optim = tf.train.AdamOptimizer(config.learning_rate).minimize(self.D_loss, var_list=self.D_vars)
         g_optim = tf.train.AdamOptimizer(config.learning_rate).minimize(self.G_loss, var_list=self.G_vars)
-        try:
-            tf.global_variables_initializer().run()
-        except:
-            tf.initializer_all_variables().run()
+        self.sess.run(tf.global_variables_initializer())
 
         # summary in log file
         self.G_sum = merge_summary([self.z_sum, self.d_fake_sum, self.g_sum, self.d_fake_loss_sum, self.g_loss_sum])
         self.D_sum = merge_summary([self.z_sum, self.d_real_sum, self.d_real_loss_sum, self.d_loss_sum])
-        self.write = SummaryWriter(os.path.join(config.out_dir, 'logs'), self.sess.graph)
+        self.writer = SummaryWriter(os.path.join(config.out_dir, 'logs'), self.sess.graph)
 
         # generate noise
         Data.load_audio()
+        Data.load_image()
 
         counter = 1
         start_time = time.time()
@@ -161,14 +160,27 @@ class BuddhaGAN(object):
             print(" === loading checkpoint Fail === ")
 
         for epoch in xrange(config.epoch):
-            shuffle_audio = rand_audio(Data.audio_data)
-            if shuffle_audio.shape[0] < config.steps*self.batch:
-                config.steps = shuffle_audio.shape[0] // self.batch
+            audios = np.random.shuffle(Data.audio_data)
+            images = np.random.shuffle(Data.image_data)
             for step in xrange(config.steps):
-                batch_audio = shuffle_audio[step*self.batch:step*self.batch+self.batch]
-                # batch_images =  TODO
+                index = random.randint(6)
+                batch_audio = audios[index:index+self.batch]
+                batch_images =  images[index:index+self.batch]
                 # update D network
-                _, summary_str = self.sess.run([d_optim, ])
+                _, summary_str = self.sess.run([d_optim, self.D_sum], 
+                    feed_dict={self.input_: batch_images,
+                               self.z: batch_audio})
+                self.writer.add_summary(summary_str, step)
+
+                # update G network
+                _, summary_str = self.sess.run([g_optim, self.G_sum],
+                    feed_dict={self.z: batch_audio})
+                self.writer.add_summary(summary_str, step)
+            output, total_loss = self.sess.run([self.G, self.total_loss], 
+                feed_dict={self.input_: batch_images, self.z: batch_audio}) # [batch, im_w, im_h, 3]
+            for idx, im in enumerate(self.output[:]):
+                self.im_save(im, "{}_{}".format(epoch, idx))
+            print("In Epoch: {:3d}, total loss: {:3f}".format(epoch, total_loss))
 
     def inference(self, config):
         raise NotImplementedError
@@ -189,3 +201,9 @@ class BuddhaGAN(object):
         else:
             print(" === Failed load checkpoint ===")
             return False, 0
+
+    def im_save(self, img, name, suffix='.jpg'):
+        im = Image.fromarray(img)
+        save_name = "./output/{}{}".format(name, suffix)
+        os.makedirs(os.path.dirname(save_name), exist_ok=True)
+        im.save(save_name)

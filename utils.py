@@ -13,7 +13,7 @@ def save_time(timestamp):
     str_time = time.strftime("%Y-%m-%d %H:%M:%S", time_local)
     return str_time
 
-def sample_audio(autio, size):
+def sample_audio(audio, size):
     if audio.size < size:
         diff = size - audio.size
         audio = np.concatenate([audio, np.zeros(diff)])
@@ -31,4 +31,3 @@ def rand_audio(audio):
     rerange = np.arange(audio.shape[0])
     np.random.shuffle(rerange)
     return audio[rerange[:]]
-    

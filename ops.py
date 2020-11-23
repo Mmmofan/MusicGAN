@@ -9,10 +9,10 @@ try:
     merge_summary = tf.merge_summary
 except:
     SummaryWriter = tf.summary.FileWriter
-    image_summary = tf.summary.image_summary
-    scalar_summary = tf.summary.scalar_summary
-    histogram_summary = tf.summary.histogram_summary
-    merge_summary = tf.summary.merge_summary
+    image_summary = tf.summary.image
+    scalar_summary = tf.summary.scalar
+    histogram_summary = tf.summary.histogram
+    merge_summary = tf.summary.merge
 
 def conv2D(x, output_dim, kernel_size=3, stride=1, bias=True, name="conv2D"):
     '''
